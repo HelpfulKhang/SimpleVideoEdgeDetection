@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HW5 ACG - 23127203</title>
+    <style>
+        :root {
+            --primary-color: #00f2fe;
+            --secondary-color: #4facfe;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden; /* Tránh thanh cuộn ngang */
+        }
+
+        h1 {
+            margin: 20px 0;
+            font-weight: 300;
+            letter-spacing: 2px;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text; 
+            background-clip: text; 
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            font-size: 1.5rem;
+        }
+
+        .upload-container {
+            margin-bottom: 20px;
+        }
+
+        .custom-file-upload {
+            display: inline-block;
+            padding: 10px 20px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--primary-color);
+            border-radius: 50px;
+            color: var(--primary-color);
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .custom-file-upload:hover {
+            background: var(--primary-color);
+            color: var(--bg-color);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
+        }
+
+        input[type="file"] { display: none; }
+
+        /* THAY ĐỔI QUAN TRỌNG: Layout tràn viền */
+        .display-area {
+            display: flex;
+            gap: 15px;
+            padding: 0 15px 20px 15px; /* Cách biên một chút để không dính chặt */
+            width: 100%;
+            box-sizing: border-box; /* Đảm bảo padding không làm tràn màn hình */
+            justify-content: center;
+        }
+
+        .view-card {
+            background: var(--card-bg);
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            flex: 1; /* Chia đều không gian */
+            display: flex;
+            flex-direction: column;
+            min-width: 0; /* Quan trọng để flex item không bị tràn */
+        }
+
+        .view-card h3 {
+            margin: 5px 0 10px 0;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        video, canvas {
+            border-radius: 4px;
+            background: #000;
+            width: 100%; /* Luôn rộng bằng card cha */
+            height: auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Homework 5 - Applied Computer Graphics - 23127203</h1>
+
+    <div class="upload-container">
+        <label for="videoUpload" class="custom-file-upload">Tải Video Lên</label>
+        <input type="file" id="videoUpload" accept="video/*">
+    </div>
+
+    <div class="display-area">
+        <div class="view-card">
+            <h3>ORIGINAL SOURCE</h3>
+            <video id="myVideo" controls loop muted></video>
+        </div>
+        
+        <div class="view-card">
+            <h3>EDGE RESULT</h3>
+            <canvas id="myCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('myVideo');
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+        const fileInput = document.getElementById('videoUpload');
+
+        // Biến đệm để tối ưu tốc độ khi khung hình to
+        let grayBuffer, outputData, rawImageData;
+        let width = 0, height = 0;
+        const SCALE_FACTOR = 0.6; // Xử lý ở 60% độ phân giải gốc để cực mượt trên màn hình lớn
+
+        fileInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                video.src = url;
+                video.play();
+            }
+        };
+
+        video.addEventListener('play', () => {
+            function step() {
+                if (video.paused || video.ended) return;
+                
+                if (width !== Math.floor(video.videoWidth * SCALE_FACTOR)) {
+                    width = Math.floor(video.videoWidth * SCALE_FACTOR);
+                    height = Math.floor(video.videoHeight * SCALE_FACTOR);
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    grayBuffer = new Uint8Array(width * height);
+                    rawImageData = ctx.createImageData(width, height);
+                    outputData = rawImageData.data;
+                }
+
+                processFrame();
+                requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        });
+
+        function processFrame() {
+            if (width === 0) return;
+            ctx.drawImage(video, 0, 0, width, height);
+            const data = ctx.getImageData(0, 0, width, height).data;
+
+            for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+                grayBuffer[j] = (data[i] + data[i + 1] + data[i + 2]) * 0.333;
+            }
+
+            for (let y = 1; y < height - 1; y++) {
+                const row = y * width;
+                const prevRow = (y - 1) * width;
+                const nextRow = (y + 1) * width;
+
+                for (let x = 1; x < width - 1; x++) {
+                    const idx = row + x;
+                    const gX = -grayBuffer[prevRow+x-1] + grayBuffer[prevRow+x+1] - 2*grayBuffer[idx-1] + 2*grayBuffer[idx+1] - grayBuffer[nextRow+x-1] + grayBuffer[nextRow+x+1];
+                    const gY = -grayBuffer[prevRow+x-1] - 2*grayBuffer[prevRow+x] - grayBuffer[prevRow+x+1] + grayBuffer[nextRow+x-1] + 2*grayBuffer[nextRow+x] + grayBuffer[nextRow+x+1];
+
+                    const magnitude = Math.abs(gX) + Math.abs(gY);
+                    const pos = idx << 2;
+                    outputData[pos] = outputData[pos+1] = outputData[pos+2] = magnitude;
+                    outputData[pos+3] = 255;
+                }
+            }
+            ctx.putImageData(rawImageData, 0, 0);
+        }
+    </script>
+</body>
+</html>
