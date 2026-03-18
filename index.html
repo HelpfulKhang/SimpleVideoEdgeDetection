@@ -104,7 +104,7 @@
     <h1>Homework 5 - Applied Computer Graphics - 23127203</h1>
 
     <div class="upload-container">
-        <label for="videoUpload" class="custom-file-upload">Tải Video Lên</label>
+        <label for="videoUpload" class="custom-file-upload">UPLOAD A MP4 FILE</label>
         <input type="file" id="videoUpload" accept="video/*">
     </div>
 
@@ -125,6 +125,10 @@
         const canvas = document.getElementById('myCanvas');
         const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
         const fileInput = document.getElementById('videoUpload');
+
+        video.onerror = function() {
+            alert("Trình duyệt không hỗ trợ định dạng video này. Vui lòng thử lại với file .mp4!");
+        };
 
         // Biến đệm để tối ưu tốc độ khi khung hình to
         let grayBuffer, outputData, rawImageData;
